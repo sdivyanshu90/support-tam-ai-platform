@@ -1,0 +1,99 @@
+name: tests-and-evals
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  offline:
+    name: Unit tests + offline eval harness
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Verify no credentials are committed
+        run: |
+          # Fails the build if a key literal or a real .env reaches the repo.
+          if git ls-files | grep -qx '.env'; then
+            echo "::error::.env is tracked by git"; exit 1
+          fi
+          # Provider key prefixes: OpenRouter (sk-or-), Cerebras (csk-),
+          # OpenAI-style (sk-), Anthropic (sk-ant-).
+          if git grep -nE '(sk-or-v1-|csk-|sk-ant-)[A-Za-z0-9_-]{16,}' -- . ':!*.md' ':!.github'; then
+            echo "::error::possible API key committed"; exit 1
+          fi
+          echo "no credentials found"
+
+      - name: Unit tests
+        run: python -m pytest
+
+      - name: Offline eval harness
+        # Runs the real harness against the deterministic baseline in
+        # evals/baseline.py. No API key, no network. Quality gates are reported
+        # but not enforced here: the baseline is a deliberately weak rule-based
+        # client and is expected to fail the adversarial cases. Gate enforcement
+        # happens on the live job below.
+        run: python -m evals.run_evals --offline
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-offline
+          path: |
+            evals/eval_report.md
+            evals/eval_report.json
+
+  live:
+    name: Live eval harness (gated)
+    runs-on: ubuntu-latest
+    # Only runs where a key is configured. Forks and PRs from forks skip it
+    # rather than failing, so the offline job is the one that must always pass.
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run live evals
+        env:
+          CEREBRAS_API_KEY: ${{ secrets.CEREBRAS_API_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          APP_MODEL: cerebras/gpt-oss-120b
+        run: |
+          if [ -z "$CEREBRAS_API_KEY" ] && [ -z "$OPENROUTER_API_KEY" ]; then
+            echo "No provider key secret configured — skipping live evals."
+            exit 0
+          fi
+          # Exits non-zero if the pass rate drops below the gate or any
+          # adversarial case regresses.
+          python -m evals.run_evals
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report-live
+          path: |
+            evals/eval_report.md
+            evals/eval_report.json

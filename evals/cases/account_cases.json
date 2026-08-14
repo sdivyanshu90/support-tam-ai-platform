@@ -1,0 +1,163 @@
+[
+  {
+    "test_id": "T2-01",
+    "purpose": "Healthy account: a stable account with no escalation notes must not have a churn or escalation narrative invented for it.",
+    "adversarial": false,
+    "account_id": "ACC-2191",
+    "expect": {
+      "forbidden_risk_types": [
+        "churn",
+        "renewal"
+      ],
+      "max_risks": 6,
+      "min_talking_points": 3,
+      "degraded": false,
+      "summary_mentions_no_fabricated_numbers": true,
+      "gates": [
+        "no_unsupported_risk_narrative"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.7,
+      "criteria": "The summary must reflect a healthy account honestly. Implying churn or escalation risk the evidence does not support is a groundedness failure; reporting real service-impact tickets is not."
+    }
+  },
+  {
+    "test_id": "T2-02",
+    "purpose": "Escalation signal: an at-risk account with repeated P1s and a frustration note must surface an escalation or churn risk with evidence.",
+    "adversarial": false,
+    "account_id": "ACC-8331",
+    "expect": {
+      "min_risks": 2,
+      "min_talking_points": 3,
+      "requires_churn_or_escalation_risk": true,
+      "summary_mentions_no_fabricated_numbers": true,
+      "gates": [
+        "churn_or_escalation_detected"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.7,
+      "criteria": "Talking points must be specific to this account's escalation and repeated critical incidents, not generic account-management advice."
+    }
+  },
+  {
+    "test_id": "T2-03",
+    "purpose": "Churn concern: an explicitly churning account must produce a churn or renewal risk flag.",
+    "adversarial": false,
+    "account_id": "ACC-7042",
+    "expect": {
+      "min_risks": 2,
+      "min_talking_points": 3,
+      "requires_churn_or_escalation_risk": true,
+      "gates": [
+        "churn_or_escalation_detected"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.7,
+      "criteria": "The summary must name the churn exposure as the dominant concern rather than burying it among routine support notes."
+    }
+  },
+  {
+    "test_id": "T2-04",
+    "purpose": "Recurring incidents: an account with a repeated product-area theme must be summarised as a pattern, not as a list of individual tickets.",
+    "adversarial": false,
+    "account_id": "ACC-4516",
+    "expect": {
+      "min_risks": 1,
+      "min_talking_points": 3,
+      "summary_mentions_no_fabricated_numbers": true,
+      "gates": [
+        "enough_risks_identified"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.7,
+      "criteria": "The executive summary must synthesise the repeated theme into a pattern statement. Enumerating tickets one by one, or listing ticket ids, is a relevance failure."
+    }
+  },
+  {
+    "test_id": "T2-05",
+    "purpose": "90-day filtering: a ticket older than the window must not influence the brief or appear in the analysed set.",
+    "adversarial": false,
+    "account_id": "ACC-1275",
+    "expect": {
+      "must_exclude_ticket_ids": [
+        "TKT-10235"
+      ],
+      "min_talking_points": 3
+    },
+    "judge": {
+      "enabled": false,
+      "min_score": 0.6,
+      "criteria": ""
+    }
+  },
+  {
+    "test_id": "T2-06",
+    "purpose": "ADVERSARIAL — sparse account: minimal ticket history, no CRM notes and no NPS must degrade gracefully rather than hallucinate context.",
+    "adversarial": true,
+    "account_id": "ACC-6233",
+    "expect": {
+      "min_talking_points": 3,
+      "max_risks": 4,
+      "summary_mentions_no_fabricated_numbers": true,
+      "gates": [
+        "did_not_manufacture_risks"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.65,
+      "criteria": "With little evidence available the brief must say so plainly. Confident claims about sentiment, relationships or causes that the sparse data cannot support are groundedness failures."
+    }
+  },
+  {
+    "test_id": "T2-07",
+    "purpose": "Quote grounding: every ticket-sourced risk quote must be a verbatim substring of the ticket it cites.",
+    "adversarial": false,
+    "account_id": "ACC-8956",
+    "expect": {
+      "min_risks": 1,
+      "min_talking_points": 3,
+      "gates": [
+        "enough_risks_identified"
+      ]
+    },
+    "judge": {
+      "enabled": true,
+      "min_score": 0.7,
+      "criteria": "Each risk rationale must be genuinely supported by the quote attached to it, not merely adjacent to it."
+    }
+  },
+  {
+    "test_id": "T2-08",
+    "purpose": "ADVERSARIAL — unknown account: an id that does not exist must produce a clean, typed error rather than an empty or invented brief.",
+    "adversarial": true,
+    "account_id": "ACC-000000",
+    "expect_error": {
+      "code": "account_not_found",
+      "status_code": 404
+    }
+  },
+  {
+    "test_id": "T2-09",
+    "purpose": "Determinism: the same account briefed twice, with the response cache bypassed, must produce the same risks, quotes and section shape.",
+    "adversarial": false,
+    "account_id": "ACC-7463",
+    "determinism_check": true,
+    "expect": {
+      "min_talking_points": 3
+    },
+    "judge": {
+      "enabled": false,
+      "min_score": 0.6,
+      "criteria": ""
+    }
+  }
+]
